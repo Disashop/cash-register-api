@@ -1,0 +1,312 @@
+openapi: 3.0.3
+info:
+  title: External Cash Register API
+  description: API documentation for the external cash register service
+  version: 1.0.0
+servers:
+  - url: 'https://{host}:44333'
+    variables:
+      host:
+        default: example.com
+paths:
+  /token:
+    post:
+      summary: Authenticate user and retrieve an access token
+      description: Authenticates the user using the provided credentials and returns an access token for authorization.
+      operationId: authenticateUser
+      tags:
+        - Authentication
+      parameters:
+        - $ref: '#/components/parameters/GrantType'
+        - $ref: '#/components/parameters/Username'
+        - $ref: '#/components/parameters/Password'
+      requestBody:
+        required: true
+        description: User credentials required for authentication.
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type:
+                  type: string
+                  description: 'OAuth2 grant type, typically ''password'' for password-based authentication.'
+                username:
+                  type: string
+                  description: The username or email of the user.
+                password:
+                  type: string
+                  format: password
+                  description: The password of the user.
+              required:
+                - grant_type
+                - username
+                - password
+      responses:
+        '200':
+          description: Successful authentication. Returns an access token and optional refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/AuthenticationResponse'
+        '400':
+          description: Bad request. Invalid or missing parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ErrorResponse'
+        '401':
+          description: Unauthorized. Invalid credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ErrorResponse'
+        '500':
+          description: Internal server error. Unexpected error during authentication.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ErrorResponse'
+  /session:
+    post:
+      summary: Execute a financial transaction
+      description: Processes a financial transaction based on the provided request payload. Requires authentication.
+      operationId: executeTransaction
+      tags:
+        - Transactions
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      requestBody:
+        required: true
+        description: 'Transaction details including amount, recipient, and other necessary data.'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/requestBodies/TransactionRequest'
+      responses:
+        '200':
+          description: Transaction executed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/TransactionResponse'
+        '400':
+          description: Bad request. The transaction data is invalid or missing required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ErrorResponse'
+        '401':
+          description: Unauthorized. The request is missing or has an invalid authentication token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ErrorResponse'
+        '403':
+          description: Forbidden. The user does not have permission to execute this transaction.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ErrorResponse'
+        '500':
+          description: Internal server error. An unexpected error occurred while processing the transaction.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ErrorResponse'
+  /status:
+    get:
+      summary: Retrieve the current status of the cash register
+      description: 'Fetches the current operational status of the cash register, including balance, last transaction details, and operational state.'
+      operationId: getCashRegisterStatus
+      tags:
+        - Cash Register
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      responses:
+        '200':
+          description: Status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/StatusResponse'
+        '400':
+          description: Bad request. Invalid parameters or missing required values.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ErrorResponse'
+        '401':
+          description: Unauthorized. Missing or invalid authentication token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ErrorResponse'
+        '403':
+          description: Forbidden. The user does not have permission to access the cash register status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ErrorResponse'
+        '500':
+          description: Internal server error. An unexpected error occurred while retrieving the cash register status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ErrorResponse'
+components:
+  parameters:
+    AuthorizationHeader:
+      name: Authorization
+      in: header
+      required: true
+      schema:
+        type: string
+        description: 'Bearer token required for authentication. Format: ''Bearer <token>'''
+    GrantType:
+      name: grant_type
+      in: query
+      required: true
+      schema:
+        type: string
+        example: password
+    Username:
+      name: username
+      in: query
+      required: true
+      schema:
+        type: string
+        description: User's unique identifier or email used for authentication.
+    Password:
+      name: password
+      in: query
+      required: true
+      schema:
+        type: string
+        format: password
+        description: User password required for authentication. It should be securely transmitted over HTTPS.
+  schemas:
+    Response:
+      type: object
+      description: Standard API response format.
+      properties:
+        status_code:
+          type: string
+          description: HTTP status code indicating the result of the request.
+          example: '200'
+          nullable: false
+        message:
+          type: string
+          description: Short message describing the result of the request.
+          example: Success
+          nullable: false
+        details:
+          type: string
+          description: 'Additional information about the response, if applicable.'
+          example: The operation was completed successfully.
+          nullable: true
+      required:
+        - status_code
+        - message
+  responses:
+    AuthenticationResponse:
+      type: object
+      description: Authentication response containing the access token.
+      properties:
+        access_token:
+          type: string
+          description: JWT or OAuth access token used for authenticated requests.
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      required:
+        - access_token
+    ErrorResponse:
+      type: object
+      description: Standard error response format.
+      properties:
+        status_code:
+          type: string
+          description: HTTP status code representing the error.
+          example: '404'
+          nullable: false
+        message:
+          type: string
+          description: Short description of the error.
+          example: Not Found
+          nullable: false
+        details:
+          type: string
+          description: 'Additional details about the error, if available.'
+          example: The requested resource was not found on the server.
+          nullable: true
+      required:
+        - status_code
+        - message
+    StatusResponse:
+      type: object
+      description: Represents the status of an operation or resource.
+      properties:
+        status:
+          type: string
+          description: Indicates the current status of the operation or resource.
+          example: success
+          nullable: false
+      required:
+        - status
+    TransactionResponse:
+      type: object
+      description: 'Response format for API operations, returning a status code and message.'
+      properties:
+        responseCode:
+          type: integer
+          description: 'Numerical code indicating the result of the operation. Returns ''0'' if successful, otherwise an error code.'
+          example: 0
+          enum:
+            - 0
+            - 10
+            - 11
+            - 12
+            - 13
+            - 14
+            - 15
+            - 16
+        responseData:
+          type: string
+          description: A short description of the operation result.
+          example: The request was successful.
+      required:
+        - responseCode
+        - responseData
+  requestBodies:
+    TransactionRequest:
+      type: object
+      description: Represents a financial operation request with an associated value when required.
+      properties:
+        request:
+          type: string
+          description: Type of financial operation to be performed.
+          enum:
+            - PayAmount
+            - RefundAmount
+            - StopPayment
+            - CancelPayment
+            - RefillCash
+            - CloseSession
+          example: PayAmount
+        value:
+          type: number
+          description: The monetary amount associated with the request. Required for 'PayAmount' and 'RefundAmount'.
+          example: 100
+          minimum: 0
+          multipleOf: 0.01
+      required:
+        - request
+      anyOf:
+        - properties:
+            request:
+              enum:
+                - PayAmount
+                - RefundAmount
+            value:
+              type: number
+          required:
+            - value
